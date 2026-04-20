@@ -1,0 +1,354 @@
+[
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";aceite hidraulico iso68",
+    "suggested": "Aceite hidraulico iso68 marca shell",
+    "confidence": 81.6,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";aceite motor mobil delvac 15w40 mx",
+    "suggested": "Aceite motor mobil delvac 15w40 mx",
+    "confidence": 99.4,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";bateria 31 h 1150",
+    "suggested": "Bateria 31 h 1150",
+    "confidence": 98.9,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";bateria 31 t 1100",
+    "suggested": "Bateria 31 t 1100",
+    "confidence": 98.9,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";breaker trifasico 50 a",
+    "suggested": "Breaker trifasico 50 a riel",
+    "confidence": 90.7,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";cable electrico automotriz negro no 10",
+    "suggested": "Cable electrico automotriz negro   10",
+    "confidence": 93.1,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";cable encauchetado 2x12",
+    "suggested": "Cable encauchetado 2x12",
+    "confidence": 99.2,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";cable encauchetado 3x10",
+    "suggested": "Cable encauchetado 3x10",
+    "confidence": 99.2,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";cable encauchetado 3x12",
+    "suggested": "Cable encauchetado 3 x 6",
+    "confidence": 82.6,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";camara de aire doble t30",
+    "suggested": "Camara de aire doble tipo t 30",
+    "confidence": 80.7,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";chumacera uct 211-j7",
+    "suggested": "Chumacera  uct 211",
+    "confidence": 87.4,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";clavija en caucho hembra 110v- 15amp",
+    "suggested": "Clavija en caucho hembra 110v- 15amp",
+    "confidence": 99.5,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";correa en v b-58",
+    "suggested": "Correa en v b-58",
+    "confidence": 98.8,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";correa en v b-60",
+    "suggested": "Correa en v b-60",
+    "confidence": 98.8,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";correa en v c-136",
+    "suggested": "Correa en v c-136",
+    "confidence": 98.9,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";disco de corte 7 pulg x 1-16",
+    "suggested": "Disco de corte 4 1/2\" x 1/16",
+    "confidence": 85.6,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";filtro aceite  p550520 - bt7237",
+    "suggested": "Filtro aceite  p550520 / bt7237",
+    "confidence": 98.1,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";filtro aire at300487 homologado rs4992",
+    "suggested": "Filtro de aire at300487 (homologado rs4992)",
+    "confidence": 90.1,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";filtro comb at223493 homologo bf 7693",
+    "suggested": "Filtro de combustible at223493 (homologo bf 7693)",
+    "confidence": 81.3,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";filtro combustible  bf1365",
+    "suggested": "Filtro combustible  bf1365 / p550904",
+    "confidence": 85.2,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";filtro combustible bf970 -p557440",
+    "suggested": "Filtro combustible bf970 /p557440",
+    "confidence": 98.2,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";filtro de aire at307501",
+    "suggested": "Filtro de aire at307501 / pa 5669",
+    "confidence": 80.6,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";filtro de aire at314583",
+    "suggested": "Filtro de aire at314583",
+    "confidence": 99.2,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";filtro de aire e cabina at191102",
+    "suggested": "Filtro de aire e cabina at191102 / pa 5314",
+    "confidence": 85.0,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";filtro de combustible bf7813 - p550881",
+    "suggested": "Filtro de combustible  p550881 / bf7813",
+    "confidence": 94.2,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";filtro separador agua-comb p551329",
+    "suggested": "Filtro separador agua/combustible p551329 / bf1280",
+    "confidence": 80.0,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";gobernador de aire or 275491",
+    "suggested": "Gobernador de aire or 275491",
+    "confidence": 99.3,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";grasa multiproposito frixo 170",
+    "suggested": "Grasa multiproposito frixo 170",
+    "confidence": 99.4,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";malla 1.77 mts x 1.77 mts 12 mm",
+    "suggested": "Malla 1.77 mts x 1,77 mts 12 mm",
+    "confidence": 98.1,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";pastilla para freno incolbest 4707b",
+    "suggested": "Pastilla o bloque para freno incolbest 4707b",
+    "confidence": 83.2,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";reflector led 200 w",
+    "suggested": "Reflector led 200 w",
+    "confidence": 99.0,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";rele termico 4-6 4,-6 amp",
+    "suggested": "Rele termico 9-13 amp",
+    "confidence": 84.1,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";soldadura 6013 x 1-8",
+    "suggested": "Soldadura 6013 x 1/8",
+    "confidence": 97.1,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";soldadura 7018 x 1-8",
+    "suggested": "Soldadura 7018 x 1/8",
+    "confidence": 97.1,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";soldadura durowell 650 x 5-32",
+    "suggested": "Soldadura durowell 650 x 5/32",
+    "confidence": 98.0,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";soldadura niquel 100",
+    "suggested": "Soldadura niquel 100",
+    "confidence": 99.0,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";tuerca normal g8 1 pulg",
+    "suggested": "Tuerca normal g8 7/16\"",
+    "confidence": 83.6,
+    "status": "pending"
+  },
+  {
+    "area": "Sst (Seguridad Y Salud En El Trabajo)",
+    "cuenta": "Dotacion Y Suministro A Trabajadores",
+    "original": ";filtros 3m d 9093c",
+    "suggested": "Filtros 9093c",
+    "confidence": 85.4,
+    "status": "pending"
+  },
+  {
+    "area": "Sst (Seguridad Y Salud En El Trabajo)",
+    "cuenta": "Dotacion Y Suministro A Trabajadores",
+    "original": ";guante de caucho t 7 cal 35",
+    "suggested": "Guante caucho cal 35 9",
+    "confidence": 85.4,
+    "status": "pending"
+  },
+  {
+    "area": "Sst (Seguridad Y Salud En El Trabajo)",
+    "cuenta": "Dotacion Y Suministro A Trabajadores",
+    "original": ";guante de vaqueta reforzado",
+    "suggested": "Guante de vaqueta largo reforzado",
+    "confidence": 85.7,
+    "status": "pending"
+  },
+  {
+    "area": "Sst (Seguridad Y Salud En El Trabajo)",
+    "cuenta": "Dotacion Y Suministro A Trabajadores",
+    "original": ";guante hyflex ultra ligero talla 9",
+    "suggested": "Guante hyflex ultra ligero ref : 11-849 talla 8",
+    "confidence": 81.8,
+    "status": "pending"
+  },
+  {
+    "area": "Sst (Seguridad Y Salud En El Trabajo)",
+    "cuenta": "Dotacion Y Suministro A Trabajadores",
+    "original": ";pieza facial media cara 7501 talla l",
+    "suggested": "Pieza facial media cara  3m 7501 ts",
+    "confidence": 85.0,
+    "status": "pending"
+  },
+  {
+    "area": "Sst (Seguridad Y Salud En El Trabajo)",
+    "cuenta": "Dotacion Y Suministro A Trabajadores",
+    "original": ";pieza facial media cara 7501 talla s",
+    "suggested": "Pieza facial media cara  3m 7501 ts",
+    "confidence": 86.2,
+    "status": "pending"
+  },
+  {
+    "area": "Sst (Seguridad Y Salud En El Trabajo)",
+    "cuenta": "Dotacion Y Suministro A Trabajadores",
+    "original": ";pieza facial media cara 7502 talla m",
+    "suggested": "Pieza facial media cara  3m 7502 tm",
+    "confidence": 85.5,
+    "status": "pending"
+  }
+]
