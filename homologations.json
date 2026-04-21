@@ -350,5 +350,141 @@
     "suggested": "Pieza facial media cara  3m 7502 tm",
     "confidence": 85.5,
     "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";aceite valvulina 80w 90 mobil",
+    "suggested": "Aceite valvulina 80w 90 mobil",
+    "confidence": 99.3,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";chumacera ucp 211-j7",
+    "suggested": "Chumacera  ucp-211-j7",
+    "confidence": 95.1,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";correa en v c-126",
+    "suggested": "Correa en v c -126",
+    "confidence": 97.8,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";filtro aceite bd7154 -fl 14000",
+    "suggested": "Filtro aceite bd7154 /fl 14000 / bd5000 / p559000",
+    "confidence": 82.1,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";filtro aire acondicionado t305634",
+    "suggested": "Filtro de aire acondicionado t305634",
+    "confidence": 91.3,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";filtro aire acondicionado t308342",
+    "suggested": "Filtro de aire acondicionado t308342",
+    "confidence": 91.3,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";filtro aire ext at472928",
+    "suggested": "Filtro aire ext at472928",
+    "confidence": 99.2,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";filtro aire int at472927",
+    "suggested": "Filtro aire int at472927",
+    "confidence": 99.2,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";filtro hidraulico bt287-10",
+    "suggested": "Filtro hidraulico bt287-10 /  p550388",
+    "confidence": 86.3,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";filtro refrigerante p552071",
+    "suggested": "Filtro refrigerante p552071 - bw5071",
+    "confidence": 86.9,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";guasa  1-2 pulg",
+    "suggested": "Guasa  1\"",
+    "confidence": 82.0,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";guaya 3-4 pulg",
+    "suggested": "Guaya 3/4\"",
+    "confidence": 81.1,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";llanta 12 r 22,5 traccion goodyear",
+    "suggested": "Llanta 12 r 22,5 traccion goodyear",
+    "confidence": 99.4,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";malla 1.77 mts x 1.77 mts 30 mm",
+    "suggested": "Malla 1.77 mts x 1.77 mts 30 mm",
+    "confidence": 99.4,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";perro galvanizado tipo pesado  3-4 pulg",
+    "suggested": "Perro galvanizado tipo pesado  3/4\"",
+    "confidence": 93.4,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";prensa mallas zaranda vibratoria 6 x1.8",
+    "suggested": "Prensa mallas para zaranda vibratoria 6 x 1.8",
+    "confidence": 86.2,
+    "status": "pending"
+  },
+  {
+    "area": "Mantenimiento",
+    "cuenta": "Consumo Inventario Almacen",
+    "original": ";retenedor 125-160-15",
+    "suggested": "Retenedor 125-160-15",
+    "confidence": 99.0,
+    "status": "pending"
   }
 ]

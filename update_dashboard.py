@@ -7,7 +7,14 @@ import textdistance
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-logging.basicConfig(filename='process_logs.log', level=logging.INFO, format='%(asctime)s - %(message)s', filemode='w', encoding='utf-8')
+logging.basicConfig(filename='process_logs.log', level=logging.INFO,
+                    format='%(asctime)s - %(message)s', filemode='w', encoding='utf-8')
+
+ALL_MONTHS = ['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06',
+              '2026-07','2026-08','2026-09','2026-10','2026-11','2026-12']
+MONTH_LABELS = {'2026-01':'Ene','2026-02':'Feb','2026-03':'Mar','2026-04':'Abr',
+                '2026-05':'May','2026-06':'Jun','2026-07':'Jul','2026-08':'Ago',
+                '2026-09':'Sep','2026-10':'Oct','2026-11':'Nov','2026-12':'Dic'}
 
 def clean(n, default="Global"):
     if pd.isna(n) or str(n).strip() == "": return default
@@ -17,8 +24,8 @@ def run_contextual_ai(df, threshold=0.8):
     suggestions = []
     grouped = df.groupby(['Responsable', 'Nombre de Cuenta'])
     for (area, cuenta), sub_df in grouped:
-        budgeted = sub_df[sub_df['Presupuesto 2026'] > 0]['Descripción'].unique().tolist()
-        executed = sub_df[sub_df['Ejecutado 2026'] > 0]['Descripción'].unique().tolist()
+        budgeted = sub_df[sub_df['Presupuesto 2026'] > 0]['Descripcion'].unique().tolist()
+        executed = sub_df[sub_df['Ejecutado 2026'] > 0]['Descripcion'].unique().tolist()
         if not budgeted or not executed: continue
         vectorizer = TfidfVectorizer().fit(budgeted + executed)
         b_tfidf = vectorizer.transform(budgeted)
@@ -31,446 +38,743 @@ def run_contextual_ai(df, threshold=0.8):
             confidence = (score * 0.4) + (jaro * 0.6)
             if confidence >= threshold and ex_item != budgeted[best_idx]:
                 suggestions.append({"area": area, "cuenta": cuenta, "original": ex_item,
-                    "suggested": budgeted[best_idx], "confidence": round(confidence * 100, 1), "status": "pending"})
+                    "suggested": budgeted[best_idx], "confidence": round(confidence * 100, 1),
+                    "status": "pending"})
     return suggestions
+
+def build_monthly_presup(df_sub):
+    r = {}
+    for m in ALL_MONTHS:
+        v = round(float(df_sub[df_sub['Ano_Mes']==m]['presup'].sum()), 2)
+        if v: r[m] = v
+    return r
+
+def build_monthly_ejec(df_sub):
+    r = {}
+    for m in ALL_MONTHS:
+        v = round(float(df_sub[df_sub['Ano_Mes']==m]['ejec'].sum()), 2)
+        if v: r[m] = v
+    return r
+
+def build_monthly_ejec_co(df_sub, companies):
+    r = {}
+    for co in companies:
+        sub = df_sub[df_sub['Nombre Empresa']==co]
+        if sub['ejec'].sum() == 0: continue
+        co_data = {}
+        for m in ALL_MONTHS:
+            v = round(float(sub[sub['Ano_Mes']==m]['ejec'].sum()), 2)
+            if v: co_data[m] = v
+        if co_data: r[co] = co_data
+    return r
 
 def main():
     try:
-        logging.info("Iniciando procesamiento de Work Centers...")
+        logging.info("Iniciando procesamiento...")
         df = pd.read_excel('Informe Presupuesto Ejecutado 2026 - Consolidado.xlsx')
         df['Presupuesto 2026'] = df['Presupuesto 2026'].fillna(0)
-        df['Ejecutado 2026'] = df['Ejecutado 2026'].fillna(0)
-        df['presup'] = df['Presupuesto 2026'] / 1000000
-        df['ejec'] = df['Ejecutado 2026'] / 1000000
-        for col in ['Dependencia', 'Responsable', 'Grupo', 'Nombre de Cuenta', 'Descripción']:
-            df[col] = df[col].apply(lambda x: clean(x, f"({col} N/A)"))
+        df['Ejecutado 2026']   = df['Ejecutado 2026'].fillna(0)
+        df['presup'] = df['Presupuesto 2026'] / 1_000_000
+        df['ejec']   = df['Ejecutado 2026']   / 1_000_000
+        df['Ano_Mes'] = df['Año Mes'].apply(lambda x: str(x).strip() if pd.notna(x) else '')
+        df['Nombre Empresa'] = df['Nombre Empresa'].apply(lambda x: clean(x, ''))
+        for col in ['Dependencia','Responsable','Grupo','Nombre de Cuenta','Descripción']:
+            df[col] = df[col].apply(lambda x: clean(x, f'({col} N/A)'))
+        df['Descripcion'] = df['Descripción']
 
         homo_decisions = []
         if os.path.exists('homologations.json'):
-            with open('homologations.json', 'r', encoding='utf-8') as f: homo_decisions = json.load(f)
+            with open('homologations.json', 'r', encoding='utf-8') as f:
+                homo_decisions = json.load(f)
         ai_suggestions = run_contextual_ai(df)
         final_homo = {f"{h['area']}|{h['cuenta']}|{h['original']}": h for h in homo_decisions}
         for s in ai_suggestions:
             key = f"{s['area']}|{s['cuenta']}|{s['original']}"
             if key not in final_homo: final_homo[key] = s
         homo_list = list(final_homo.values())
-        with open('homologations.json', 'w', encoding='utf-8') as f: json.dump(homo_list, f, indent=2, ensure_ascii=False)
+        with open('homologations.json', 'w', encoding='utf-8') as f:
+            json.dump(homo_list, f, indent=2, ensure_ascii=False)
 
-        approved_map = {(h['area'], h['cuenta'], h['original']): h['suggested'] for h in homo_list if h['status'] == 'approved'}
+        approved_map = {(h['area'], h['cuenta'], h['original']): h['suggested']
+                        for h in homo_list if h['status'] == 'approved'}
         def apply_homo(row):
-            key = (row['Responsable'], row['Nombre de Cuenta'], row['Descripción'])
-            return approved_map.get(key, row['Descripción'])
+            key = (row['Responsable'], row['Nombre de Cuenta'], row['Descripcion'])
+            return approved_map.get(key, row['Descripcion'])
         df['Desc_Final'] = df.apply(apply_homo, axis=1)
+
+        companies = sorted([c for c in df[df['ejec']>0]['Nombre Empresa'].dropna().unique() if c])
 
         data = []
         for dep_n, d_df in df.groupby('Dependencia'):
-            dep = {'name': dep_n, 'presup': round(d_df['presup'].sum(), 2), 'ejec': round(d_df['ejec'].sum(), 2), 'areas': []}
+            dep = {
+                'name': dep_n,
+                'presup': round(d_df['presup'].sum(), 2),
+                'ejec':   round(d_df['ejec'].sum(), 2),
+                'presup_m': build_monthly_presup(d_df),
+                'ejec_m':   build_monthly_ejec(d_df),
+                'ejec_m_co': build_monthly_ejec_co(d_df, companies),
+                'areas': []
+            }
             for resp_n, a_df in d_df.groupby('Responsable'):
-                area = {'name': resp_n, 'presup': round(a_df['presup'].sum(), 2), 'ejec': round(a_df['ejec'].sum(), 2), 'groups': []}
+                area = {
+                    'name': resp_n,
+                    'presup': round(a_df['presup'].sum(), 2),
+                    'ejec':   round(a_df['ejec'].sum(), 2),
+                    'presup_m': build_monthly_presup(a_df),
+                    'ejec_m':   build_monthly_ejec(a_df),
+                    'ejec_m_co': build_monthly_ejec_co(a_df, companies),
+                    'groups': []
+                }
                 for grp_n, g_df in a_df.groupby('Grupo'):
-                    grp = {'name': grp_n, 'presup': round(g_df['presup'].sum(), 2), 'ejec': round(g_df['ejec'].sum(), 2), 'accounts': []}
+                    grp = {
+                        'name': grp_n,
+                        'presup': round(g_df['presup'].sum(), 2),
+                        'ejec':   round(g_df['ejec'].sum(), 2),
+                        'presup_m': build_monthly_presup(g_df),
+                        'ejec_m':   build_monthly_ejec(g_df),
+                        'accounts': []   # no ejec_m_co at group level to keep JSON lean
+                    }
                     for acc_n, acc_df in g_df.groupby('Nombre de Cuenta'):
-                        acc = {'name': acc_n, 'presup': round(acc_df['presup'].sum(), 2), 'ejec': round(acc_df['ejec'].sum(), 2), 'items': []}
+                        acc = {
+                            'name': acc_n,
+                            'presup': round(acc_df['presup'].sum(), 2),
+                            'ejec':   round(acc_df['ejec'].sum(), 2),
+                            'items': []
+                        }
                         for item_n, i_df in acc_df.groupby('Desc_Final'):
-                            acc['items'].append({'name': clean(item_n), 'presup': round(i_df['presup'].sum(), 2), 'ejec': round(i_df['ejec'].sum(), 2)})
+                            ip = round(i_df['presup'].sum(), 2)
+                            ie = round(i_df['ejec'].sum(), 2)
+                            if ip != 0 or ie != 0:
+                                acc['items'].append({
+                                    'name': clean(item_n),
+                                    'presup': ip, 'ejec': ie
+                                })
                         acc['items'].sort(key=lambda x: x['presup'], reverse=True)
                         grp['accounts'].append(acc)
                     area['groups'].append(grp)
                 dep['areas'].append(area)
             data.append(dep)
 
-        def add_ids(node, prefix):
-            node['id'] = prefix
-            for k in ['areas', 'groups', 'accounts']:
-                if k in node:
-                    for i, child in enumerate(node[k]): add_ids(child, f"{prefix}_{k[0]}{i}")
-        for i, d in enumerate(data): add_ids(d, f"d{i}")
-
-        write_workcenter_html(data, homo_list)
+        write_html(data, homo_list, companies)
         print("SUCCESS")
     except Exception as e:
         logging.error(f"FATAL: {e}", exc_info=True)
         print(f"ERROR: {e}")
 
 
-def write_workcenter_html(data, homologations):
-    js_data = json.dumps(data, ensure_ascii=False)
-    js_homo = json.dumps(homologations, ensure_ascii=False)
+def write_html(data, homologations, companies):
+    js_data      = json.dumps(data, ensure_ascii=False)
+    js_homo      = json.dumps(homologations, ensure_ascii=False)
+    js_companies = json.dumps(companies, ensure_ascii=False)
+    js_months    = json.dumps(ALL_MONTHS, ensure_ascii=False)
+    js_labels    = json.dumps(MONTH_LABELS, ensure_ascii=False)
 
     CSS = """
-*, *::before, *::after { box-sizing: border-box; }
-body { font-family: 'Inter', sans-serif; background: #F0F4F8; color: #1A2535; margin: 0; display: flex; min-height: 100vh; }
-
-/* Sidebar */
-.sidebar { width: 232px; background: #FFFFFF; border-right: 1px solid #E4E8EF; display: flex; flex-direction: column; position: fixed; height: 100vh; }
-.side-logo { padding: 18px 20px; font-size: 14px; font-weight: 800; color: #1A2535; border-bottom: 1px solid #E4E8EF; letter-spacing: .5px; }
-.side-logo span { color: #185FA5; }
-.side-section { padding: 14px 16px 4px; font-size: 10px; font-weight: 700; color: #B0BEC5; letter-spacing: .1em; text-transform: uppercase; }
-.side-menu { flex: 1; padding: 6px 0; overflow-y: auto; }
-.menu-item { padding: 9px 16px; cursor: pointer; display: flex; align-items: center; gap: 9px; color: #6B7A8D; font-weight: 500; font-size: 13px; border-radius: 6px; margin: 2px 8px; transition: background .12s, color .12s; }
-.menu-item:hover { color: #1A2535; background: #F0F4F8; }
-.menu-item.active { background: #EFF6FF; color: #185FA5; font-weight: 600; }
-.menu-item.disabled { opacity: 0.3; cursor: default; }
-.side-footer { padding: 14px 20px; font-size: 10px; color: #C0CCDA; border-top: 1px solid #E4E8EF; }
-
-/* Main */
-.main { flex: 1; margin-left: 232px; display: flex; flex-direction: column; min-height: 100vh; }
-.top-bar { height: 52px; background: #FFFFFF; border-bottom: 1px solid #E4E8EF; display: flex; align-items: center; padding: 0 24px; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', sans-serif; background: #F0F4F8; color: #1A2535; display: flex; min-height: 100vh; }
+.sidebar { width: 56px; background: #0F172A; display: flex; flex-direction: column; position: fixed; height: 100vh; z-index: 200; overflow: hidden; transition: width 0.22s cubic-bezier(.4,0,.2,1); }
+.sidebar:hover { width: 220px; }
+.side-logo { padding: 16px 14px 14px; border-bottom: 1px solid #1E293B; display: flex; align-items: center; gap: 10px; min-height: 56px; }
+.side-logo-icon { font-size: 15px; font-weight: 900; color: #3B82F6; flex-shrink: 0; width: 28px; text-align: center; }
+.side-logo-text { opacity: 0; white-space: nowrap; transition: opacity 0.15s; }
+.sidebar:hover .side-logo-text { opacity: 1; }
+.side-logo-main { font-size: 13px; font-weight: 800; color: #F1F5F9; letter-spacing: .5px; }
+.side-logo-sub  { font-size: 10px; color: #64748B; margin-top: 1px; }
+.side-section   { padding: 16px 14px 4px; font-size: 9px; font-weight: 700; color: #475569; letter-spacing: .12em; text-transform: uppercase; white-space: nowrap; opacity: 0; transition: opacity 0.15s; }
+.sidebar:hover .side-section { opacity: 1; }
+.side-menu      { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 4px 0 12px; }
+.menu-item { padding: 9px 14px; cursor: pointer; display: flex; align-items: center; gap: 10px; color: #94A3B8; font-size: 13px; font-weight: 500; border-radius: 6px; margin: 1px 6px; transition: background .12s, color .12s; white-space: nowrap; }
+.menu-item:hover  { color: #F1F5F9; background: #1E293B; }
+.menu-item.active { background: #1E3A5F; color: #60A5FA; font-weight: 600; }
+.menu-item.disabled { opacity: .25; cursor: default; pointer-events: none; }
+.menu-icon { width: 20px; text-align: center; flex-shrink: 0; font-size: 14px; }
+.menu-text { opacity: 0; transition: opacity 0.15s; }
+.sidebar:hover .menu-text { opacity: 1; }
+.side-footer { padding: 10px 14px; font-size: 9px; color: #334155; border-top: 1px solid #1E293B; white-space: nowrap; opacity: 0; transition: opacity 0.15s; }
+.sidebar:hover .side-footer { opacity: 1; }
+.main { flex: 1; margin-left: 56px; display: flex; flex-direction: column; min-height: 100vh; transition: margin-left 0.22s cubic-bezier(.4,0,.2,1); }
+.top-bar { height: 52px; background: #fff; border-bottom: 1px solid #E4E8EF; display: flex; align-items: center; padding: 0 24px; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
 .top-title { font-weight: 700; font-size: 14px; color: #1A2535; }
-.top-meta  { font-size: 11px; color: #8A99AA; }
 .content { padding: 20px 24px; flex: 1; }
-.hidden { display: none; }
-
-/* Island */
-.dd-island { background: #FFFFFF; border-radius: 12px; padding: 20px 24px 24px; box-shadow: 0 1px 4px rgba(0,0,0,.07); border: 1px solid #E4E8EF; }
-
-/* Breadcrumb */
+.hidden { display: none !important; }
+.filter-bar { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+.filter-label { font-size: 11px; font-weight: 600; color: #8A99AA; text-transform: uppercase; letter-spacing: .06em; }
+.co-tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.co-tab { padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 500; cursor: pointer; border: 1px solid #E4E8EF; background: #fff; color: #6B7A8D; transition: all .12s; white-space: nowrap; }
+.co-tab:hover  { border-color: #93C5FD; color: #185FA5; }
+.co-tab.active { background: #EFF6FF; border-color: #3B82F6; color: #185FA5; font-weight: 600; }
+.filter-sep { width: 1px; height: 22px; background: #E4E8EF; flex-shrink: 0; }
+.period-select { padding: 5px 10px; border: 1px solid #E4E8EF; border-radius: 7px; font-size: 12px; font-family: inherit; color: #2E3A4A; background: #fff; cursor: pointer; }
+.mode-toggle { display: flex; border: 1px solid #E4E8EF; border-radius: 7px; overflow: hidden; }
+.mode-btn { padding: 5px 13px; font-size: 12px; font-weight: 500; cursor: pointer; background: #fff; color: #6B7A8D; border: none; transition: all .12s; }
+.mode-btn.active { background: #EFF6FF; color: #185FA5; font-weight: 600; }
 .dd-breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #6B7A8D; margin-bottom: 18px; flex-wrap: wrap; }
 .dd-bc-link   { color: #185FA5; cursor: pointer; font-weight: 500; }
 .dd-bc-link:hover { text-decoration: underline; }
 .dd-bc-sep    { color: #C0CCDA; }
 .dd-bc-active { color: #1A2535; font-weight: 600; }
-
-/* Grids */
-.dd-kpi-grid   { display: grid; grid-template-columns: repeat(auto-fill, minmax(155px,1fr)); gap: 12px; margin-bottom: 18px; }
-.dd-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px,1fr)); gap: 14px; margin-bottom: 20px; }
-.dd-cards-sm   { grid-template-columns: repeat(auto-fill, minmax(180px,1fr)); }
-
-/* Cards */
-.dd-card { background: #FFFFFF; border: 1px solid #E4E8EF; border-radius: 10px; padding: 16px 14px 12px; cursor: pointer; transition: box-shadow .15s, transform .12s; display: flex; flex-direction: column; gap: 5px; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
-.dd-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.10); transform: translateY(-2px); }
-.dd-card-sm  { padding: 13px 13px 11px; }
-.dd-card-kpi { cursor: default; background: #F8FAFC; }
-.dd-card-kpi:hover { transform: none; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
-.dd-card-header { display: flex; align-items: center; gap: 7px; margin-bottom: 1px; }
-.dd-dot { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
-.dd-card-name { font-size: 12px; font-weight: 600; color: #1A2535; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.dd-card-amount { font-size: 22px; font-weight: 700; color: #0F1924; line-height: 1.15; }
-.dd-card-sm .dd-card-amount { font-size: 18px; }
-.dd-card-sub { font-size: 11px; color: #8A99AA; }
-.dd-bar-wrap { height: 3px; background: #E8EDF2; border-radius: 2px; overflow: hidden; margin: 2px 0 3px; }
-.dd-bar { height: 100%; border-radius: 2px; transition: width .4s; }
-.dd-card-subitems { display: flex; flex-direction: column; gap: 3px; border-top: 1px solid #EEF1F5; padding-top: 7px; margin-top: 1px; }
-.dd-card-subrow { display: flex; justify-content: space-between; align-items: center; font-size: 11px; }
-.dd-card-subname { color: #6B7A8D; }
-.dd-card-subpct  { color: #2E3A4A; font-weight: 600; }
-.dd-card-link { font-size: 11px; color: #185FA5; margin-top: 5px; font-weight: 500; }
-.dd-card:hover .dd-card-link { text-decoration: underline; }
-
-/* Chart */
-.dd-chart-section { background: #F8FAFC; border: 1px solid #E4E8EF; border-radius: 10px; padding: 16px 20px 12px; margin-top: 4px; }
-
-/* L3 area detail */
-.dd-area-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
-.dd-area-title  { font-size: 16px; font-weight: 700; color: #1A2535; }
-.dd-homo-btn { background: #EFF6FF; color: #185FA5; border: 1px solid #BFDBFE; border-radius: 7px; padding: 7px 14px; font-size: 12px; font-weight: 600; cursor: pointer; }
-.dd-homo-btn:hover { background: #DBEAFE; }
-.dd-section-title { font-size: 11px; font-weight: 700; color: #8A99AA; letter-spacing: .07em; text-transform: uppercase; margin: 18px 0 10px; }
-
-/* Summary boxes */
-.dd-l3-summary { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px,1fr)); gap: 10px; margin-bottom: 4px; }
-.dd-l3-sum-item { background: #F8FAFC; border: 1px solid #E4E8EF; border-radius: 8px; padding: 10px 12px; }
-.dd-l3-sum-label { font-size: 10px; font-weight: 700; color: #8A99AA; letter-spacing: .05em; text-transform: uppercase; margin-bottom: 3px; }
-.dd-l3-sum-val   { font-size: 17px; font-weight: 700; color: #0F1924; }
-.dd-pos { color: #059669; }
-.dd-neg { color: #DC2626; }
-
-/* Detail table */
-.dd-detail-table { width: 100%; border-collapse: collapse; font-size: 13px; border: 1px solid #E4E8EF; border-radius: 10px; overflow: hidden; }
-.dd-detail-table th { background: #F5F7FA; color: #8A99AA; font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; padding: 9px 12px; border-bottom: 1px solid #E4E8EF; text-align: left; }
-.dd-group-row td { background: #EFF6FF; color: #185FA5; font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; padding: 6px 12px; border-top: 2px solid #BFDBFE; border-bottom: 1px solid #BFDBFE; }
-.dd-acc-row td   { background: #F8FAFC; color: #6B7A8D; font-size: 11px; font-weight: 600; padding: 5px 12px 5px 24px; border-bottom: 1px solid #EEF1F5; }
-.dd-item-row td  { padding: 9px 12px 9px 32px; border-bottom: 1px solid #F0F3F7; color: #2E3A4A; vertical-align: middle; }
-.dd-item-row:last-child td { border-bottom: none; }
-.dd-item-row:hover td { background: #FAFBFC; }
-.dd-val-cell { text-align: right; font-weight: 600; color: #0F1924; white-space: nowrap; }
-.dd-pct-cell { text-align: right; font-size: 11px; color: #8A99AA; white-space: nowrap; }
-.dd-bar-cell { width: 120px; padding-right: 12px !important; }
-
-/* Homo */
-.homo-island { background: #FFFFFF; border-radius: 12px; padding: 20px 24px 24px; box-shadow: 0 1px 4px rgba(0,0,0,.07); border: 1px solid #E4E8EF; }
-.homo-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; flex-wrap: wrap; gap: 8px; }
-.homo-title  { font-size: 15px; font-weight: 700; color: #1A2535; margin: 0; }
+.tag { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.tag-g { background: #E1F5EE; color: #085041; }
+.tag-y { background: #FAEEDA; color: #633806; }
+.tag-r { background: #FCEBEB; color: #791F1F; }
+.dep-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px,1fr)); gap: 16px; margin-bottom: 20px; }
+.dep-card { background: #fff; border: 1px solid #E4E8EF; border-radius: 12px; padding: 18px 18px 14px; cursor: pointer; transition: box-shadow .15s, transform .12s; }
+.dep-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,.09); transform: translateY(-2px); }
+.dep-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.dep-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+.dep-name { font-size: 13px; font-weight: 700; color: #1A2535; line-height: 1.3; }
+.dep-kpi-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+.dep-kpi { background: #F8FAFC; border-radius: 7px; padding: 8px 10px; }
+.dep-kpi-lbl { font-size: 9px; font-weight: 700; color: #8A99AA; text-transform: uppercase; letter-spacing: .06em; }
+.dep-kpi-val { font-size: 18px; font-weight: 700; color: #0F1924; line-height: 1.2; }
+.prog-track { height: 6px; background: #E8EDF2; border-radius: 3px; overflow: hidden; margin: 8px 0 6px; }
+.prog-fill  { height: 100%; border-radius: 3px; transition: width .4s; }
+.dep-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 4px; }
+.dep-link { font-size: 11px; color: #185FA5; font-weight: 600; }
+.area-preview { display: flex; flex-direction: column; gap: 3px; margin: 8px 0; border-top: 1px solid #EEF1F5; padding-top: 8px; }
+.area-prev-row { display: flex; align-items: center; gap: 6px; font-size: 11px; color: #6B7A8D; }
+.sem-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.area-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 14px; margin-bottom: 20px; }
+.area-card { background: #fff; border: 1px solid #E4E8EF; border-radius: 10px; padding: 15px 15px 12px; cursor: pointer; transition: box-shadow .15s, transform .12s; }
+.area-card:hover { box-shadow: 0 4px 14px rgba(0,0,0,.10); transform: translateY(-2px); }
+.area-name { font-size: 12px; font-weight: 700; color: #1A2535; margin-bottom: 8px; }
+.area-kpi-row { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-bottom: 8px; }
+.area-kpi { background: #F8FAFC; border-radius: 6px; padding: 6px 9px; }
+.area-kpi-lbl { font-size: 9px; font-weight: 700; color: #8A99AA; text-transform: uppercase; }
+.area-kpi-val { font-size: 15px; font-weight: 700; color: #0F1924; }
+.grp-mini { display: flex; flex-direction: column; gap: 4px; margin-top: 8px; border-top: 1px solid #EEF1F5; padding-top: 8px; }
+.grp-mini-row { display: flex; align-items: center; gap: 6px; }
+.grp-mini-lbl { font-size: 10px; color: #6B7A8D; width: 90px; flex-shrink: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.grp-mini-track { flex: 1; height: 4px; background: #E8EDF2; border-radius: 2px; overflow: hidden; }
+.grp-mini-fill  { height: 100%; border-radius: 2px; }
+.grp-mini-pct { font-size: 10px; font-weight: 600; color: #4B5563; width: 28px; text-align: right; }
+.area-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; }
+.area-link { font-size: 11px; color: #185FA5; font-weight: 600; }
+.chart-wrap { background: #F8FAFC; border: 1px solid #E4E8EF; border-radius: 10px; padding: 16px 20px; margin-bottom: 16px; }
+.chart-title { font-size: 11px; font-weight: 700; color: #8A99AA; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 12px; }
+.detail-table { width: 100%; border-collapse: collapse; font-size: 12px; border: 1px solid #E4E8EF; border-radius: 10px; overflow: hidden; margin-bottom: 16px; }
+.detail-table th { background: #F5F7FA; color: #8A99AA; font-size: 9px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; padding: 8px 12px; border-bottom: 1px solid #E4E8EF; text-align: left; }
+.detail-table th.r { text-align: right; }
+.row-grp td { background: #F0F4F8; color: #374151; font-size: 10px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 7px 12px; border-top: 2px solid #E4E8EF; border-bottom: 1px solid #E4E8EF; }
+.row-item td { padding: 8px 12px 8px 28px; border-bottom: 1px solid #F3F4F6; color: #374151; vertical-align: middle; }
+.row-item:hover td { background: #FAFBFC; }
+.row-total td { padding: 9px 12px; background: #1A2535; color: #F1F5F9; font-weight: 700; font-size: 12px; }
+.r { text-align: right; }
+.vari-up   { color: #791F1F; font-weight: 600; }
+.vari-down { color: #085041; font-weight: 600; }
+.bar-cell  { width: 110px; }
+.emb-track { height: 5px; background: #E8EDF2; border-radius: 3px; overflow: hidden; margin-top: 3px; }
+.emb-fill  { height: 100%; border-radius: 3px; }
+.badge-g { display: inline-block; background: #374151; color: #fff; font-size: 9px; font-weight: 700; border-radius: 3px; padding: 1px 5px; margin-right: 6px; }
+.homo-island  { background: #fff; border-radius: 12px; padding: 20px 24px 24px; border: 1px solid #E4E8EF; }
+.homo-header  { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; flex-wrap: wrap; gap: 8px; }
+.homo-title   { font-size: 15px; font-weight: 700; color: #1A2535; }
 .homo-filter-badge { background: #FEF3C7; color: #B45309; border: 1px solid #FDE68A; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 600; }
-.homo-sub    { font-size: 12px; color: #8A99AA; margin: 0 0 16px; }
-.homo-table  { width: 100%; border-collapse: collapse; font-size: 12px; border: 1px solid #E4E8EF; border-radius: 10px; overflow: hidden; }
+.homo-sub     { font-size: 12px; color: #8A99AA; margin: 0 0 16px; }
+.homo-table   { width: 100%; border-collapse: collapse; font-size: 12px; border: 1px solid #E4E8EF; border-radius: 10px; overflow: hidden; }
 .homo-table th { background: #F5F7FA; color: #8A99AA; font-size: 10px; font-weight: 700; letter-spacing: .07em; text-transform: uppercase; padding: 9px 12px; border-bottom: 1px solid #E4E8EF; text-align: left; }
 .homo-table td { padding: 9px 12px; border-bottom: 1px solid #F0F3F7; color: #2E3A4A; vertical-align: middle; }
 .homo-table tr:last-child td { border-bottom: none; }
+.homo-input { border: 1px solid #E4E8EF; border-radius: 5px; padding: 4px 8px; font-size: 12px; width: 160px; }
 .btn-primary { background: #185FA5; color: #fff; border: none; padding: 8px 18px; border-radius: 7px; cursor: pointer; font-weight: 600; font-size: 13px; }
-.btn-primary:hover { background: #1352914; }
-.btn-ghost   { background: transparent; color: #6B7A8D; border: 1px solid #E4E8EF; padding: 7px 14px; border-radius: 7px; cursor: pointer; font-size: 12px; font-weight: 500; }
+.btn-primary:hover { background: #135091; }
+.btn-sm { padding: 3px 10px !important; font-size: 11px !important; }
+.btn-ghost { background: transparent; color: #6B7A8D; border: 1px solid #E4E8EF; padding: 7px 14px; border-radius: 7px; cursor: pointer; font-size: 12px; font-weight: 500; }
 .btn-ghost:hover { background: #F0F4F8; }
+.btn-approve { background: #DCFCE7 !important; color: #166534 !important; border-color: #BBF7D0 !important; }
+.btn-reject  { background: #FEE2E2 !important; color: #991B1B !important; border-color: #FECACA !important; }
 .pill { padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; }
 """
 
     JS = ("""
-const DATA = """ + js_data + """;
-const HOMOLOGATIONS = """ + js_homo + """;
-let state = { level: 0, depIdx: 0, areaIdx: 0 };
-let homoFilter = null;
+const DATA        = """ + js_data + """;
+const ALL_MONTHS  = """ + js_months + """;
+const MONTH_LBLS  = """ + js_labels + """;
+const COMPANIES   = """ + js_companies + """;
+var   HOMOLOGATIONS = """ + js_homo + """;
 
-const DD_PALETTE = [
-  { color: '#185FA5' }, { color: '#0F6E56' }, { color: '#B45309' },
-  { color: '#7C3AED' }, { color: '#B91C1C' }, { color: '#0369A1' }
-];
+var state = { level: 0, depIdx: 0, areaIdx: 0, cutMonth: '2026-02', mode: 'acum', co: 'all' };
+var homoFilter = null;
+var _cL1 = null, _cL2 = null;
+var expandedGroups = {};   /* gi -> true/false; default collapsed */
+function tglGrp(gi) { expandedGroups[gi] = !expandedGroups[gi]; render(); }
 
-function _ddShort(v) {
-  var a = Math.abs(v || 0);
-  if (a >= 1e9) return '$' + (a/1e9).toFixed(1) + 'MM';
-  if (a >= 1e6) return '$' + (a/1e6).toFixed(0) + 'M';
-  if (a >= 1e3) return '$' + (a/1e3).toFixed(0) + 'k';
-  return '$0';
+/* ── Colors ── */
+var DEP_COLORS = ['#534AB7','#0F6E56','#BA7517','#B91C1C','#0369A1','#7C3AED','#0891B2','#D97706','#BE185D','#047857'];
+function depColor(i) { return DEP_COLORS[i % DEP_COLORS.length]; }
+
+/* ── Semaphore ── */
+function semColor(p) { return p<=85?'#085041':p<=100?'#633806':'#791F1F'; }
+function semBg(p)    { return p<=85?'#E1F5EE':p<=100?'#FAEEDA':'#FCEBEB'; }
+function semDot(p)   { return p<=85?'#22C55E':p<=100?'#F59E0B':'#E24B4A'; }
+function semTag(p) {
+  var cls = p<=85?'tag-g':p<=100?'tag-y':'tag-r';
+  var lbl = p<=85?'En rango':p<=100?'Al l\u00edmite':'Excedido';
+  return '<span class="tag '+cls+'">'+p+'%\u00a0'+lbl+'</span>';
 }
 
-function _svgBarChart(items) {
-  if (!items || !items.length) return '';
-  var PL=150, PR=10, PT=10, PB=24, ROW=34, W=520;
-  var H = items.length * ROW + PT + PB;
-  var IW = W - PL - PR;
-  var maxV = Math.max.apply(null, items.map(function(i){return Math.abs(i.value||0);}));
-  if(maxV===0) maxV=1;
-  var nTicks=5, raw=maxV/(nTicks-1), mag=Math.pow(10,Math.floor(Math.log10(raw)||0));
-  var tick=Math.ceil(raw/mag)*mag, axMax=tick*(nTicks-1);
-  var grid='', xLbls='', bars='';
-  for(var t=0;t<nTicks;t++){
-    var x=PL+(t/(nTicks-1))*IW, val=t*tick;
-    grid  += '<line x1="'+x+'" y1="'+PT+'" x2="'+x+'" y2="'+(PT+items.length*ROW)+'" stroke="#E8EDF2" stroke-width="0.5"/>';
-    xLbls += '<text x="'+x+'" y="'+(PT+items.length*ROW+14)+'" text-anchor="middle" fill="#B0BEC5" font-size="9" font-family="system-ui">'+_ddShort(val)+'</text>';
-  }
-  for(var i=0;i<items.length;i++){
-    var it=items[i], y=PT+i*ROW, bH=18, bY=y+(ROW-bH)/2;
-    var bW=axMax>0?(Math.abs(it.value||0)/axMax)*IW:0;
-    var lbl=it.label.length>22?it.label.substring(0,22)+'...':it.label;
-    bars += '<text x="'+(PL-8)+'" y="'+(bY+bH/2+4)+'" text-anchor="end" fill="#4B5563" font-size="11" font-family="system-ui">'+lbl+'</text>'
-          + '<rect x="'+PL+'" y="'+bY+'" width="'+IW+'" height="'+bH+'" rx="3" fill="#F0F4F8"/>'
-          + '<rect x="'+PL+'" y="'+bY+'" width="'+Math.max(bW,2)+'" height="'+bH+'" rx="3" fill="'+it.color+'" opacity="0.85"/>';
-  }
-  return '<div class="dd-chart-section"><svg viewBox="0 0 '+W+' '+H+'" style="width:100%;max-width:'+W+'px;display:block;overflow:visible">'+grid+bars+xLbls+'</svg></div>';
+/* ── Formatters ── */
+function fmtK(v) {
+  var a = Math.abs(v||0), s = v<0?'-':'';
+  if (a>=1e9) return s+'$'+(a/1e9).toFixed(1)+'MM';
+  if (a>=1e6) return s+'$'+(a/1e6).toFixed(1)+'M';
+  if (a>=1e3) return s+'$'+(a/1e3).toFixed(0)+'k';
+  return s+'$'+Math.round(a);
+}
+function fmtFull(v) {
+  var a = Math.abs(Math.round(v||0));
+  return (v<0?'-':'')+'$'+a.toLocaleString('es-CO');
 }
 
-var pct = function(e,p){ return p===0?(e>0?100:0):Math.round(e/p*100); };
-var barC = function(p){ return p<50?'#3B82F6':p<90?'#F59E0B':p<=100?'#059669':'#DC2626'; };
-var pal = function(i){ return DD_PALETTE[i%DD_PALETTE.length].color; };
+/* ── Progress bar ── */
+function progBar(ejec, presup, color) {
+  var r = presup>0 ? ejec/presup : (ejec>0?2:0);
+  var w = Math.min(r,1)*100;
+  var over = r>1;
+  return '<div class="prog-track"><div class="prog-fill" style="width:'+w+'%;background:'+(over?'#E24B4A':color)+'"></div></div>';
+}
 
+/* ── Varianza ── */
+function variCell(presup, ejec) {
+  var v = presup - ejec;
+  if (v >= 0) return '<span class="vari-down">\u25bc '+fmtFull(v*1e6)+'</span>';
+  return '<span class="vari-up">\u25b2 +'+fmtFull(Math.abs(v)*1e6)+'</span>';
+}
+
+/* ── Cut-aware getters ── */
+function getPresup(node) {
+  if (!node.presup_m) return node.presup;
+  if (state.mode === 'mensual') return Math.round((node.presup_m[state.cutMonth]||0)*100)/100;
+  var t = 0;
+  for (var m in node.presup_m) { if (m <= state.cutMonth) t += node.presup_m[m]; }
+  return Math.round(t*100)/100;
+}
+function getEjec(node) {
+  if (state.co !== 'all') {
+    var cd = (node.ejec_m_co && node.ejec_m_co[state.co]) || {};
+    if (state.mode === 'mensual') return Math.round((cd[state.cutMonth]||0)*100)/100;
+    var t = 0;
+    for (var m in cd) { if (m <= state.cutMonth) t += cd[m]; }
+    return Math.round(t*100)/100;
+  }
+  if (!node.ejec_m) return node.ejec;
+  if (state.mode === 'mensual') return Math.round((node.ejec_m[state.cutMonth]||0)*100)/100;
+  var t = 0;
+  for (var m in node.ejec_m) { if (m <= state.cutMonth) t += node.ejec_m[m]; }
+  return Math.round(t*100)/100;
+}
+function pct(e, p) { return p===0?(e>0?999:0):Math.round(e/p*100); }
+
+/* ── Filter bar ── */
+function buildFilterBar() {
+  var coH = '<div class="co-tab'+(state.co==='all'?' active':'')+'" onclick="setCo(0)">Grupo</div>';
+  COMPANIES.forEach(function(co, ci) {
+    var s = co.replace('C.I. Fortia Minerals S.A.S.','Fortia Minerals')
+              .replace('Sociedad Portuaria Coalcorp S.A.','Coalcorp')
+              .replace('Fortia Investments Colombia S.A.S.','Investments')
+              .replace('Transcaribbean Chartering S.A.','Transcaribbean')
+              .replace(' S.A.S.','').replace(' S.A.','').replace(' S. De R.L.','');
+    coH += '<div class="co-tab'+(state.co===co?' active':'')+'" onclick="setCo('+(ci+1)+')">'+s+'</div>';
+  });
+  var pH = '<select class="period-select" onchange="setCut(this.selectedIndex)">';
+  ALL_MONTHS.forEach(function(m){ pH += '<option'+(m===state.cutMonth?' selected':'')+'>Corte: '+MONTH_LBLS[m]+' 2026</option>'; });
+  pH += '</select>';
+  var mH = '<div class="mode-toggle">'
+    +'<button class="mode-btn'+(state.mode==='acum'?' active':'')+'" onclick="setMode(0)">Acumulado</button>'
+    +'<button class="mode-btn'+(state.mode==='mensual'?' active':'')+'" onclick="setMode(1)">Mensual</button>'
+    +'</div>';
+  return '<div class="filter-bar"><span class="filter-label">Empresa</span><div class="co-tabs">'+coH+'</div>'
+    +'<div class="filter-sep"></div>'+pH+'<div class="filter-sep"></div>'+mH+'</div>';
+}
+function setCo(i)  { state.co = i===0?'all':COMPANIES[i-1]; render(); }
+function setCut(i) { state.cutMonth = ALL_MONTHS[i]; render(); }
+function setMode(m){ state.mode = m===0?'acum':'mensual'; render(); }
+
+/* ── Breadcrumb ── */
+function bc(parts) {
+  var h = '<div class="dd-breadcrumb">';
+  parts.forEach(function(p,i){
+    if (i>0) h += '<span class="dd-bc-sep">\u203a</span>';
+    h += p.fn ? '<span class="dd-bc-link" onclick="'+p.fn+'">'+p.t+'</span>'
+               : '<span class="dd-bc-active">'+p.t+'</span>';
+  });
+  return h+'</div>';
+}
+
+/* ── Navigation ── */
 function openWC(id) {
   document.getElementById('wc-dash').classList.toggle('hidden', id!=='dash');
   document.getElementById('wc-homo').classList.toggle('hidden', id!=='homo');
   document.getElementById('m-dash').classList.toggle('active', id==='dash');
   document.getElementById('m-homo').classList.toggle('active', id==='homo');
-  document.getElementById('wc-title').textContent = id==='dash' ? 'Monitor Presupuestal' : 'Homologaciones IA';
-  if(id==='homo') renderHomo(); else render();
+  document.getElementById('wc-title').textContent = id==='dash'?'Monitor Presupuestal':'Homologaciones IA';
+  if (id==='homo') renderHomo(); else render();
 }
-
 function render() {
   var c = document.getElementById('wc-dash');
-  if(state.level===0) renderL0(c);
-  else if(state.level===1) renderL1(c);
+  if (state.level===0) renderL0(c);
+  else if (state.level===1) renderL1(c);
   else renderL2(c);
 }
 
-/* ── L0: dependencias ── */
+/* ══ NIVEL 1 ══ */
 function renderL0(c) {
-  var tp=DATA.reduce(function(s,d){return s+d.presup;},0);
-  var te=DATA.reduce(function(s,d){return s+d.ejec;},0);
-  var pp=pct(te,tp);
-  var kpis=[
-    {lbl:'Presupuesto 2026', val:_ddShort(tp*1e6), sub:'Total aprobado'},
-    {lbl:'Total Ejecutado',  val:_ddShort(te*1e6), sub:'Acumulado año'},
-    {lbl:'Saldo Disponible', val:_ddShort((tp-te)*1e6), sub:'Por ejecutar'},
-    {lbl:'Ejecución',        val:pp+'%', bar:pp}
-  ];
-  var kpiH = kpis.map(function(k){
-    return '<div class="dd-card dd-card-kpi">'
-      +'<div class="dd-card-sub">'+k.lbl+'</div>'
-      +'<div class="dd-card-amount" style="font-size:20px">'+k.val+'</div>'
-      +(k.sub?'<div class="dd-card-sub">'+k.sub+'</div>':'')
-      +(k.bar!==undefined?'<div class="dd-bar-wrap"><div class="dd-bar" style="width:'+Math.min(k.bar,100)+'%;background:'+barC(k.bar)+'"></div></div>':'')
-      +'</div>';
-  }).join('');
-  var depH = DATA.map(function(d,i){
-    var p=pct(d.ejec,d.presup);
-    return '<div class="dd-card" onclick="state.level=1;state.depIdx='+i+';render()">'
-      +'<div class="dd-card-header"><div class="dd-dot" style="background:'+pal(i)+'"></div>'
-      +'<div class="dd-card-name" title="'+d.name+'">'+d.name+'</div></div>'
-      +'<div class="dd-card-amount">'+_ddShort(d.ejec*1e6)+'</div>'
-      +'<div class="dd-card-sub">de '+_ddShort(d.presup*1e6)+'</div>'
-      +'<div class="dd-bar-wrap"><div class="dd-bar" style="width:'+Math.min(p,100)+'%;background:'+barC(p)+'"></div></div>'
-      +'<div class="dd-card-subrow"><span class="dd-card-subname">Ejecuci\u00f3n</span><span class="dd-card-subpct" style="color:'+barC(p)+'">'+p+'%</span></div>'
-      +'<div class="dd-card-link">Ver \u00e1reas \u2192</div>'
-      +'</div>';
-  }).join('');
-  var chartItems=DATA.map(function(d,i){return{label:d.name,value:d.ejec*1e6,color:pal(i)};});
-  c.innerHTML='<div class="dd-island"><div class="dd-kpi-grid">'+kpiH+'</div>'
-    +'<div class="dd-cards-grid">'+depH+'</div>'+_svgBarChart(chartItems)+'</div>';
+  var tp = DATA.reduce(function(s,d){ return s+getPresup(d); },0);
+  var te = DATA.reduce(function(s,d){ return s+getEjec(d); },0);
+  var pp = pct(te, tp);
+  var modeLbl = state.mode==='mensual'?'Mes '+MONTH_LBLS[state.cutMonth]:'Acum. hasta '+MONTH_LBLS[state.cutMonth];
+
+  var kpiH = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px;margin-bottom:20px">'
+    +[{l:'Presupuesto Periodo',v:fmtK(tp*1e6),s:modeLbl},
+      {l:'Total Ejecutado',v:fmtK(te*1e6),s:modeLbl},
+      {l:'Saldo',v:fmtK((tp-te)*1e6),s:'Por ejecutar'},
+      {l:'Ejecuci\u00f3n',v:pp+'%',tag:1}
+    ].map(function(k){
+      return '<div style="background:#F8FAFC;border:1px solid #E4E8EF;border-radius:8px;padding:10px 12px">'
+        +'<div style="font-size:9px;font-weight:700;color:#8A99AA;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px">'+k.l+'</div>'
+        +'<div style="font-size:20px;font-weight:700;color:#0F1924;line-height:1.2">'+k.v+'</div>'
+        +(k.tag?semTag(pp):'<div style="font-size:10px;color:#8A99AA;margin-top:2px">'+k.s+'</div>')
+        +'</div>';
+    }).join('')+'</div>';
+
+  var cardsH = '<div class="dep-grid">'
+    +DATA.map(function(d,i){
+      var dp=getPresup(d), de=getEjec(d), p=pct(de,dp), color=depColor(i);
+      var prevH = d.areas.slice(0,3).map(function(a){
+        var p2=pct(getEjec(a),getPresup(a));
+        var nm=a.name.length>26?a.name.substring(0,26)+'...':a.name;
+        return '<div class="area-prev-row"><span class="sem-dot" style="background:'+semDot(p2)+'"></span>'+nm+'</div>';
+      }).join('');
+      if (d.areas.length>3) prevH+='<div style="font-size:10px;color:#B0BEC5;margin-top:2px">+'+(d.areas.length-3)+' m\u00e1s</div>';
+      return '<div class="dep-card" onclick="state.level=1;state.depIdx='+i+';render()">'
+        +'<div class="dep-card-header"><div class="dep-dot" style="background:'+color+'"></div>'
+        +'<div class="dep-name">'+d.name+'</div></div>'
+        +'<div class="dep-kpi-row">'
+        +'<div class="dep-kpi"><div class="dep-kpi-lbl">Presupuesto</div><div class="dep-kpi-val">'+fmtK(dp*1e6)+'</div></div>'
+        +'<div class="dep-kpi"><div class="dep-kpi-lbl">Ejecutado</div><div class="dep-kpi-val">'+fmtK(de*1e6)+'</div></div>'
+        +'</div>'
+        +progBar(de,dp,color)
+        +'<div class="dep-footer">'+semTag(p)+'</div>'
+        +'<div class="area-preview">'+prevH+'</div>'
+        +'<div class="dep-footer"><span class="dep-link">Ver \u00e1reas \u2192</span></div>'
+        +'</div>';
+    }).join('')+'</div>';
+
+  c.innerHTML = buildFilterBar()+kpiH+cardsH;
 }
 
-/* ── L1: áreas/responsables ── */
+/* ══ NIVEL 2 ══ */
 function renderL1(c) {
-  var dep=DATA[state.depIdx], di=state.depIdx;
-  var areaH=dep.areas.map(function(a,i){
-    var p=pct(a.ejec,a.presup);
-    return '<div class="dd-card dd-card-sm" onclick="state.level=2;state.areaIdx='+i+';render()">'
-      +'<div class="dd-card-header"><div class="dd-dot" style="background:'+pal(di+i+1)+'"></div>'
-      +'<div class="dd-card-name" title="'+a.name+'">'+a.name+'</div></div>'
-      +'<div class="dd-card-amount">'+_ddShort(a.ejec*1e6)+'</div>'
-      +'<div class="dd-card-sub">de '+_ddShort(a.presup*1e6)+'</div>'
-      +'<div class="dd-bar-wrap"><div class="dd-bar" style="width:'+Math.min(p,100)+'%;background:'+barC(p)+'"></div></div>'
-      +'<div class="dd-card-subitems">'
-      +'<div class="dd-card-subrow"><span class="dd-card-subname">Ejecuci\u00f3n</span><span class="dd-card-subpct" style="color:'+barC(p)+'">'+p+'%</span></div>'
-      +'<div class="dd-card-subrow"><span class="dd-card-subname">Grupos</span><span class="dd-card-subpct">'+a.groups.length+'</span></div>'
-      +'</div><div class="dd-card-link">Ver detalle \u2192</div></div>';
-  }).join('');
-  var chartItems=dep.areas.map(function(a,i){return{label:a.name,value:a.ejec*1e6,color:pal(di+i+1)};});
-  c.innerHTML='<div class="dd-island">'
-    +'<div class="dd-breadcrumb">'
-    +'<span class="dd-bc-link" onclick="state.level=0;render()">Inicio</span>'
-    +'<span class="dd-bc-sep">\u203a</span>'
-    +'<span class="dd-bc-active">'+dep.name+'</span>'
-    +'</div>'
-    +'<div class="dd-cards-grid dd-cards-sm">'+areaH+'</div>'
-    +_svgBarChart(chartItems)+'</div>';
+  var dep=DATA[state.depIdx], di=state.depIdx, color=depColor(di);
+
+  var cardsH = '<div class="area-grid">'
+    +dep.areas.map(function(a,i){
+      var ap=getPresup(a), ae=getEjec(a), p=pct(ae,ap);
+      var grpH = a.groups.slice(0,4).map(function(g){
+        var gp=getPresup(g), ge=getEjec(g), gp2=pct(ge,gp);
+        var lbl=g.name.replace(/_/g,' ');
+        lbl=lbl.length>15?lbl.substring(0,15)+'...':lbl;
+        return '<div class="grp-mini-row">'
+          +'<div class="grp-mini-lbl">'+lbl+'</div>'
+          +'<div class="grp-mini-track"><div class="grp-mini-fill" style="width:'+Math.min(gp2,100)+'%;background:'+(gp2>100?'#E24B4A':color)+'"></div></div>'
+          +'<div class="grp-mini-pct">'+gp2+'%</div>'
+          +'</div>';
+      }).join('');
+      return '<div class="area-card" onclick="state.level=2;state.areaIdx='+i+';expandedGroups={};render()">'
+        +'<div class="area-name">'+a.name+'</div>'
+        +'<div class="area-kpi-row">'
+        +'<div class="area-kpi"><div class="area-kpi-lbl">Presupuesto</div><div class="area-kpi-val">'+fmtK(ap*1e6)+'</div></div>'
+        +'<div class="area-kpi"><div class="area-kpi-lbl">Ejecutado</div><div class="area-kpi-val">'+fmtK(ae*1e6)+'</div></div>'
+        +'</div>'
+        +progBar(ae,ap,color)
+        +'<div class="grp-mini">'+grpH+'</div>'
+        +'<div class="area-footer">'+semTag(p)+'<span class="area-link">Ver detalle \u2192</span></div>'
+        +'</div>';
+    }).join('')+'</div>';
+
+  var chartH2 = dep.areas.length * 34 + 50;
+  var chartH = '<div class="chart-wrap">'
+    +'<div class="chart-title">Presupuesto vs Ejecutado por \u00c1rea</div>'
+    +'<div style="position:relative;height:'+chartH2+'px"><canvas id="chart-l1"></canvas></div></div>';
+
+  c.innerHTML = buildFilterBar()
+    +bc([{t:'Todas las dependencias',fn:'state.level=0;render()'},{t:dep.name}])
+    +cardsH+chartH;
+
+  setTimeout(function(){
+    var el=document.getElementById('chart-l1');
+    if (!el) return;
+    if (_cL1) { _cL1.destroy(); _cL1=null; }
+    _cL1 = new Chart(el.getContext('2d'),{
+      type:'bar',
+      data:{
+        labels:dep.areas.map(function(a){return a.name;}),
+        datasets:[
+          {label:'Presupuesto',data:dep.areas.map(function(a){return getPresup(a)*1e6;}),backgroundColor:'rgba(0,0,0,0.09)',borderRadius:3},
+          {label:'Ejecutado',data:dep.areas.map(function(a){return getEjec(a)*1e6;}),backgroundColor:color+'CC',borderRadius:3}
+        ]
+      },
+      options:{
+        indexAxis:'y',responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{labels:{font:{size:11}}}},
+        scales:{
+          x:{grid:{color:'#E8EDF2'},ticks:{font:{size:10},callback:function(v){return '$'+Math.round(v/1e6)+'M';}}},
+          y:{grid:{display:false},ticks:{font:{size:10}}}
+        }
+      }
+    });
+  },0);
 }
 
-/* ── L2: detalle de área ── */
+/* ══ NIVEL 3 ══ */
 function renderL2(c) {
   var dep=DATA[state.depIdx], di=state.depIdx;
-  var area=dep.areas[state.areaIdx], ai=state.areaIdx;
-  var saldo=area.presup-area.ejec, pp=pct(area.ejec,area.presup);
+  var area=dep.areas[state.areaIdx];
+  var color=depColor(di);
+  var ap=getPresup(area), ae=getEjec(area), pp=pct(ae,ap), saldo=ap-ae;
 
-  /* grupo cards */
-  var grpCards=area.groups.map(function(g,i){
-    var p=pct(g.ejec,g.presup);
-    var lbl=g.name.replace(/_/g,' ');
-    return '<div class="dd-card dd-card-sm dd-card-kpi">'
-      +'<div class="dd-card-header"><div class="dd-dot" style="background:'+pal(di+ai+i+2)+'"></div>'
-      +'<div class="dd-card-name" title="'+lbl+'">'+lbl+'</div></div>'
-      +'<div class="dd-card-amount">'+_ddShort(g.ejec*1e6)+'</div>'
-      +'<div class="dd-card-sub">de '+_ddShort(g.presup*1e6)+'</div>'
-      +'<div class="dd-bar-wrap"><div class="dd-bar" style="width:'+Math.min(p,100)+'%;background:'+barC(p)+'"></div></div>'
-      +'<div class="dd-card-subrow"><span class="dd-card-subname">Ejecuci\u00f3n</span><span class="dd-card-subpct" style="color:'+barC(p)+'">'+p+'%</span></div>'
-      +'</div>';
-  }).join('');
+  var kpiH = '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;margin-bottom:16px">'
+    +[{l:'Presupuesto',v:fmtK(ap*1e6)},{l:'Ejecutado',v:fmtK(ae*1e6)},
+      {l:'Saldo',v:fmtK(saldo*1e6),neg:saldo<0},{l:'Ejecuci\u00f3n',tag:1}
+    ].map(function(k){
+      return '<div style="background:#F8FAFC;border:1px solid #E4E8EF;border-radius:8px;padding:9px 12px">'
+        +'<div style="font-size:9px;font-weight:700;color:#8A99AA;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">'+k.l+'</div>'
+        +(k.tag?semTag(pp):'<div style="font-size:17px;font-weight:700;color:'+(k.neg?'#791F1F':'#0F1924')+'">'+k.v+'</div>')
+        +'</div>';
+    }).join('')+'</div>';
 
-  var chartGrp=area.groups.map(function(g,i){return{label:g.name.replace(/_/g,' '),value:g.ejec*1e6,color:pal(di+ai+i+2)};});
-
-  /* tabla jerárquica */
-  var rows='';
+  /* collect totals for chart */
+  var allItems=[], totP=0, totE=0;
   area.groups.forEach(function(g){
-    var grpLbl=g.name.replace(/_/g,' ');
-    rows+='<tr class="dd-group-row"><td colspan="5">'+grpLbl+'</td></tr>';
     g.accounts.forEach(function(acc){
-      rows+='<tr class="dd-acc-row"><td colspan="5">'+acc.name+'</td></tr>';
       acc.items.forEach(function(item){
-        var ip=pct(item.ejec,item.presup);
-        rows+='<tr class="dd-item-row">'
-          +'<td>'+item.name+'</td>'
-          +'<td class="dd-val-cell">'+_ddShort(item.presup*1e6)+'</td>'
-          +'<td class="dd-val-cell">'+_ddShort(item.ejec*1e6)+'</td>'
-          +'<td class="dd-bar-cell"><div class="dd-bar-wrap"><div class="dd-bar" style="width:'+Math.min(ip,100)+'%;background:'+barC(ip)+'"></div></div></td>'
-          +'<td class="dd-pct-cell">'+ip+'%</td>'
-          +'</tr>';
+        if (item.presup===0 && item.ejec===0) return;
+        totP+=item.presup; totE+=item.ejec;
+        allItems.push({name:item.name,presup:item.presup,ejec:item.ejec});
       });
     });
   });
 
-  c.innerHTML='<div class="dd-island">'
-    +'<div class="dd-breadcrumb">'
-    +'<span class="dd-bc-link" onclick="state.level=0;render()">Inicio</span>'
-    +'<span class="dd-bc-sep">\u203a</span>'
-    +'<span class="dd-bc-link" onclick="state.level=1;render()">'+dep.name+'</span>'
-    +'<span class="dd-bc-sep">\u203a</span>'
-    +'<span class="dd-bc-active">'+area.name+'</span>'
-    +'</div>'
-    +'<div class="dd-area-header">'
-    +'<span class="dd-area-title">'+area.name+'</span>'
-    +'<button class="dd-homo-btn" onclick="showAreaHomo()">Ver Homologaciones del \u00c1rea</button>'
-    +'</div>'
-    +'<div class="dd-l3-summary">'
-    +'<div class="dd-l3-sum-item"><div class="dd-l3-sum-label">Presupuesto</div><div class="dd-l3-sum-val">'+_ddShort(area.presup*1e6)+'</div></div>'
-    +'<div class="dd-l3-sum-item"><div class="dd-l3-sum-label">Ejecutado</div><div class="dd-l3-sum-val">'+_ddShort(area.ejec*1e6)+'</div></div>'
-    +'<div class="dd-l3-sum-item"><div class="dd-l3-sum-label">Saldo</div><div class="dd-l3-sum-val '+(saldo<0?'dd-neg':'dd-pos')+'">'+_ddShort(saldo*1e6)+'</div></div>'
-    +'<div class="dd-l3-sum-item"><div class="dd-l3-sum-label">Ejecuci\u00f3n</div><div class="dd-l3-sum-val" style="color:'+barC(pp)+'">'+pp+'%</div></div>'
-    +'</div>'
-    +'<div class="dd-section-title">Informe por Grupo de Cuenta</div>'
-    +'<div class="dd-cards-grid dd-cards-sm">'+grpCards+'</div>'
-    +_svgBarChart(chartGrp)
-    +'<div class="dd-section-title" style="margin-top:20px">\u00cdtems Detallados</div>'
-    +'<table class="dd-detail-table">'
-    +'<thead><tr>'
-    +'<th>Descripci\u00f3n</th>'
-    +'<th style="text-align:right">Presupuesto</th>'
-    +'<th style="text-align:right">Ejecutado</th>'
-    +'<th class="dd-bar-cell">Progreso</th>'
-    +'<th style="text-align:right">%</th>'
-    +'</tr></thead><tbody>'+rows+'</tbody></table>'
-    +'</div>';
+  /* expandable table */
+  var rows='';
+  area.groups.forEach(function(g, gi){
+    var gp=getPresup(g), ge=getEjec(g), gpct=pct(ge,gp);
+    var lbl=g.name.replace(/_/g,' ');
+    var open = expandedGroups[gi] === true;
+    var icon = open ? '\u25bc' : '\u25ba';
+
+    /* collapsed: show item name chips as preview */
+    var preview='';
+    if (!open) {
+      var chips=[];
+      g.accounts.forEach(function(acc){ acc.items.forEach(function(item){ if(item.presup||item.ejec) chips.push(item.name); }); });
+      if (chips.length) {
+        var shown=chips.slice(0,4).map(function(n){ return '<span style="background:#E8EDF2;border-radius:4px;padding:1px 6px;font-size:10px;color:#374151;white-space:nowrap">'+n+'</span>'; }).join(' ');
+        var more=chips.length>4?' <span style="font-size:10px;color:#94A3B8">+'+(chips.length-4)+' m\u00e1s</span>':'';
+        preview='<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">'+shown+more+'</div>';
+      }
+    }
+
+    rows+='<tr class="row-grp" style="cursor:pointer" onclick="tglGrp('+gi+')">'
+      +'<td colspan="5">'
+      +'<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">'
+      +'<div><span style="font-size:9px;margin-right:5px;color:#6B7A8D">'+icon+'</span><span class="badge-g">G</span>'+lbl+'</div>'
+      +'<div style="display:flex;gap:8px;align-items:center;flex-shrink:0">'+fmtFull(gp*1e6)+' / '+fmtFull(ge*1e6)+'\u00a0'+semTag(gpct)+'</div>'
+      +'</div>'+(preview||'')+'</td></tr>';
+
+    if (open) {
+      g.accounts.forEach(function(acc){
+        acc.items.forEach(function(item){
+          if (item.presup===0 && item.ejec===0) return;
+          var ip=item.presup, ie=item.ejec, ipct=pct(ie,ip);
+          rows+='<tr class="row-item">'
+            +'<td>'+item.name+'</td>'
+            +'<td class="r">'+fmtFull(ip*1e6)+'</td>'
+            +'<td class="r">'+fmtFull(ie*1e6)+'</td>'
+            +'<td class="r">'+variCell(ip,ie)+'</td>'
+            +'<td class="bar-cell r">'
+            +'<div style="font-size:11px;font-weight:600;color:'+semColor(ipct)+'">'+ipct+'%</div>'
+            +'<div class="emb-track"><div class="emb-fill" style="width:'+Math.min(ipct,100)+'%;background:'+(ipct>100?'#E24B4A':color)+'"></div></div>'
+            +semTag(ipct)+'</td></tr>';
+        });
+      });
+    }
+  });
+
+  var tpct=pct(totE,totP);
+  rows+='<tr class="row-total"><td>TOTAL \u00c1REA</td>'
+    +'<td class="r">'+fmtFull(totP*1e6)+'</td>'
+    +'<td class="r">'+fmtFull(totE*1e6)+'</td>'
+    +'<td class="r">'+variCell(totP,totE)+'</td>'
+    +'<td class="r">'+tpct+'%</td></tr>';
+
+  var top20=allItems.slice().sort(function(a,b){return b.ejec-a.ejec;}).slice(0,20);
+  var tableH='<table class="detail-table"><thead><tr>'
+    +'<th>Descripci\u00f3n <span style="font-weight:400;color:#B0BEC5">(clic en \u25ba para expandir)</span></th>'
+    +'<th class="r">Presupuesto</th><th class="r">Ejecutado</th>'
+    +'<th class="r">Varianza</th><th class="r bar-cell">Ejecuci\u00f3n</th>'
+    +'</tr></thead><tbody>'+rows+'</tbody></table>';
+
+  var chartPxH=top20.length*28+50;
+  var chartH='<div class="chart-wrap"><div class="chart-title">Ejecuci\u00f3n por \u00cdtem \u2014 Top 20</div>'
+    +'<div style="position:relative;height:'+chartPxH+'px"><canvas id="chart-l2"></canvas></div></div>';
+
+  var hBtn='<button style="background:#EFF6FF;color:#185FA5;border:1px solid #BFDBFE;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer;margin-bottom:16px" onclick="showAreaHomo()">Ver Homologaciones del \u00c1rea</button>';
+
+  c.innerHTML=buildFilterBar()
+    +bc([{t:'Todas las dependencias',fn:'state.level=0;render()'},{t:dep.name,fn:'state.level=1;render()'},{t:area.name}])
+    +hBtn+kpiH+tableH+chartH;
+
+  setTimeout(function(){
+    var el=document.getElementById('chart-l2');
+    if (!el) return;
+    if (_cL2) { _cL2.destroy(); _cL2=null; }
+    _cL2 = new Chart(el.getContext('2d'),{
+      type:'bar',
+      data:{
+        labels:top20.map(function(it){return it.name;}),
+        datasets:[{
+          label:'Ejecutado',
+          data:top20.map(function(it){return it.ejec*1e6;}),
+          backgroundColor:top20.map(function(it){return it.ejec>it.presup?'#E24B4A':color+'CC';}),
+          borderRadius:3
+        }]
+      },
+      options:{
+        indexAxis:'y',responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:false}},
+        scales:{
+          x:{grid:{color:'#E8EDF2'},ticks:{font:{size:10},callback:function(v){return '$'+Math.round(v/1e6)+'M';}}},
+          y:{grid:{display:false},ticks:{font:{size:9}}}
+        }
+      }
+    });
+  },0);
 }
 
-/* ── Homologaciones ── */
+/* ── Homo ── */
 function showAreaHomo() {
-  var area=DATA[state.depIdx].areas[state.areaIdx];
-  homoFilter=area.name;
+  homoFilter = DATA[state.depIdx].areas[state.areaIdx].name;
   openWC('homo');
 }
+var _homoFormOpen = false;
 
 function renderHomo() {
-  var items=homoFilter
-    ? HOMOLOGATIONS.filter(function(h){return h.area===homoFilter;})
-    : HOMOLOGATIONS;
-  var badge=homoFilter
+  var items = homoFilter ? HOMOLOGATIONS.filter(function(h){return h.area===homoFilter;}) : HOMOLOGATIONS;
+  var badge = homoFilter
     ? '<span class="homo-filter-badge">Filtrado: '+homoFilter+'</span>'
       +'<button class="btn-ghost" style="margin-left:8px" onclick="homoFilter=null;renderHomo()">Ver todas</button>'
     : '';
-  document.getElementById('homo-header-extra').innerHTML=badge;
-  var b=document.getElementById('homo-body');
-  b.innerHTML=items.length===0
-    ? '<tr><td colspan="5" style="text-align:center;color:#8A99AA;padding:24px">Sin homologaciones para esta \u00e1rea</td></tr>'
-    : items.map(function(h,idx){
-        var realIdx=HOMOLOGATIONS.indexOf(h);
-        return '<tr>'
-          +'<td style="font-size:11px"><b>'+h.area+'</b><br><span style="color:#8A99AA">'+h.cuenta+'</span></td>'
-          +'<td>'+h.original+'</td>'
-          +'<td style="color:#185FA5;font-weight:600">'+h.suggested+'</td>'
-          +'<td><span class="pill" style="background:#E6F1FB;color:#185FA5">'+h.confidence+'%</span></td>'
-          +'<td>'+(h.status==='pending'
-            ?'<button class="btn-primary" style="padding:3px 10px;font-size:11px" onclick="updH('+realIdx+')">Aprobar</button>'
-            :'<span style="font-weight:600;color:#059669">&#10003; Aprobada</span>')
-          +'</td></tr>';
-      }).join('');
+  document.getElementById('homo-header-extra').innerHTML = badge;
+
+  /* ── Manual entry form ── */
+  var areaDefault = homoFilter || '';
+  var formH = _homoFormOpen
+    ? '<div id="homo-form" style="background:#F8FAFC;border:1px solid #E4E8EF;border-radius:10px;padding:16px 18px;margin-bottom:16px">'
+      +'<div style="font-size:12px;font-weight:700;color:#1A2535;margin-bottom:12px">Nueva homologaci\u00f3n manual</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">'
+      +'<div><label style="font-size:10px;font-weight:700;color:#8A99AA;text-transform:uppercase;display:block;margin-bottom:3px">\u00c1rea</label>'
+      +'<input id="hf-area" class="homo-input" style="width:100%" placeholder="\u00c1rea responsable" value="'+areaDefault+'"/></div>'
+      +'<div><label style="font-size:10px;font-weight:700;color:#8A99AA;text-transform:uppercase;display:block;margin-bottom:3px">Cuenta</label>'
+      +'<input id="hf-cuenta" class="homo-input" style="width:100%" placeholder="Nombre de cuenta"/></div>'
+      +'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">'
+      +'<div><label style="font-size:10px;font-weight:700;color:#8A99AA;text-transform:uppercase;display:block;margin-bottom:3px">Texto ejecutado (original)</label>'
+      +'<input id="hf-orig" class="homo-input" style="width:100%" placeholder="Descripci\u00f3n tal como aparece en ejecuci\u00f3n"/></div>'
+      +'<div><label style="font-size:10px;font-weight:700;color:#8A99AA;text-transform:uppercase;display:block;margin-bottom:3px">Mapear a (sugerencia)</label>'
+      +'<input id="hf-sugg" class="homo-input" style="width:100%" placeholder="Descripci\u00f3n presupuestada a la que debe imputarse"/></div>'
+      +'</div>'
+      +'<div style="display:flex;gap:8px">'
+      +'<button class="btn-primary btn-sm" onclick="addManualHomo()" style="padding:6px 16px;font-size:12px">Guardar homologaci\u00f3n</button>'
+      +'<button class="btn-ghost btn-sm" onclick="_homoFormOpen=false;renderHomo()" style="padding:6px 14px;font-size:12px">Cancelar</button>'
+      +'</div></div>'
+    : '';
+
+  document.getElementById('homo-form-wrap').innerHTML = formH;
+
+  var b = document.getElementById('homo-body');
+  if (!items.length) {
+    b.innerHTML='<tr><td colspan="6" style="text-align:center;color:#8A99AA;padding:24px">Sin homologaciones — agrega una manualmente con el bot\u00f3n de arriba.</td></tr>';
+    return;
+  }
+  b.innerHTML = items.map(function(h){
+    var ri=HOMOLOGATIONS.indexOf(h), sc='';
+    if (h.status==='approved') {
+      sc='<span style="font-weight:600;color:#059669">&#10003; Aprobada</span> <button class="btn-ghost btn-sm btn-reject" onclick="updH('+ri+',2)">Rechazar</button>';
+    } else if (h.status==='rejected') {
+      sc='<span style="font-weight:600;color:#DC2626">&#10007; Rechazada</span> <button class="btn-ghost btn-sm btn-approve" onclick="updH('+ri+',1)">Aprobar</button>';
+    } else {
+      sc='<button class="btn-primary btn-sm btn-approve" onclick="updH('+ri+',1)">Aprobar</button> <button class="btn-ghost btn-sm btn-reject" onclick="updH('+ri+',2)">Rechazar</button>';
+    }
+    return '<tr>'
+      +'<td style="font-size:11px"><b>'+h.area+'</b><br><span style="color:#8A99AA">'+h.cuenta+'</span></td>'
+      +'<td>'+h.original+'</td>'
+      +'<td style="color:#185FA5;font-weight:600">'+h.suggested+'</td>'
+      +'<td><input class="homo-input" value="'+h.suggested+'" onchange="setManual('+ri+',this.value)"/></td>'
+      +'<td><span class="pill" style="background:#E6F1FB;color:#185FA5">'+h.confidence+'%</span></td>'
+      +'<td>'+sc+'</td></tr>';
+  }).join('');
 }
 
-function updH(idx){ HOMOLOGATIONS[idx].status='approved'; renderHomo(); }
+function addManualHomo() {
+  var area  = (document.getElementById('hf-area')  ||{}).value||'';
+  var cta   = (document.getElementById('hf-cuenta') ||{}).value||'';
+  var orig  = (document.getElementById('hf-orig')   ||{}).value||'';
+  var sugg  = (document.getElementById('hf-sugg')   ||{}).value||'';
+  if (!area || !orig || !sugg) { alert('Completa al menos \u00c1rea, Texto original y Sugerencia.'); return; }
+  HOMOLOGATIONS.push({ area:area, cuenta:cta||'(Manual)', original:orig, suggested:sugg, confidence:100, status:'approved' });
+  _homoFormOpen = false;
+  renderHomo();
+}
+
+function updH(idx,s){ HOMOLOGATIONS[idx].status=s===1?'approved':s===2?'rejected':'pending'; renderHomo(); }
+function setManual(idx,val){ HOMOLOGATIONS[idx].suggested=val; }
+function approveAllArea(){
+  var a=homoFilter;
+  HOMOLOGATIONS.forEach(function(h){if(!a||h.area===a)h.status='approved';});
+  renderHomo();
+}
 function saveHomo(){
   var blob=new Blob([JSON.stringify(HOMOLOGATIONS,null,2)],{type:'application/json'});
   var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='homologations.json'; a.click();
-  alert('Descargado. Reemplaza el archivo y vuelve a ejecutar el .BAT para aplicar los cambios.');
+  alert('Descargado. Reemplaza el archivo y re-ejecuta el script para aplicar los cambios.');
 }
 
 render();
 """)
 
-    html = (
+    HTML = (
         '<!DOCTYPE html>\n<html lang="es">\n<head>\n'
-        '<meta charset="UTF-8"><title>Fortia \u00b7 Monitor Presupuestal 2026</title>\n'
-        '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">\n'
+        '<meta charset="UTF-8">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        '<title>Fortia \u00b7 Monitor Presupuestal 2026</title>\n'
+        '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">\n'
+        '<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>\n'
         '<style>' + CSS + '</style>\n</head>\n<body>\n'
         '<div class="sidebar">\n'
-        '  <div class="side-logo">FORTIA <span>\u00b7</span> ERP</div>\n'
+        '  <div class="side-logo">'
+        '<div class="side-logo-icon">F</div>'
+        '<div class="side-logo-text">'
+        '<div class="side-logo-main">FORTIA <span style="color:#3B82F6">\u00b7</span> ERP</div>'
+        '<div class="side-logo-sub">Gesti\u00f3n Presupuestal 2026</div>'
+        '</div></div>\n'
         '  <div class="side-menu">\n'
-        '    <div class="side-section">Gesti\u00f3n</div>\n'
-        '    <div class="menu-item active" id="m-dash" onclick="openWC(\'dash\')">&#9673; Monitor Presupuesto</div>\n'
-        '    <div class="menu-item" id="m-homo" onclick="openWC(\'homo\')">&#10038; Homologaci\u00f3n IA</div>\n'
+        '    <div class="side-section">An\u00e1lisis</div>\n'
+        '    <div class="menu-item active" id="m-dash" onclick="openWC(\'dash\')">'
+        '<span class="menu-icon">&#9673;</span><span class="menu-text">Monitor Presupuesto</span></div>\n'
+        '    <div class="side-section">Modificaciones</div>\n'
+        '    <div class="menu-item" id="m-homo" onclick="openWC(\'homo\')">'
+        '<span class="menu-icon">&#10038;</span><span class="menu-text">Homologaci\u00f3n IA</span></div>\n'
         '    <div class="side-section">Pr\u00f3ximamente</div>\n'
-        '    <div class="menu-item disabled">&#9675; Monitor Ingresos</div>\n'
-        '    <div class="menu-item disabled">&#9675; Usuarios y Permisos</div>\n'
+        '    <div class="menu-item disabled"><span class="menu-icon">&#9675;</span><span class="menu-text">Monitor Ingresos</span></div>\n'
+        '    <div class="menu-item disabled"><span class="menu-icon">&#9675;</span><span class="menu-text">Usuarios y Permisos</span></div>\n'
         '  </div>\n'
-        '  <div class="side-footer">v2.2 \u00b7 Fortia Minerals 2026</div>\n'
+        '  <div class="side-footer">v3.1 \u00b7 Fortia Minerals 2026</div>\n'
         '</div>\n'
         '<div class="main">\n'
         '  <div class="top-bar">\n'
         '    <div id="wc-title" class="top-title">Monitor Presupuestal</div>\n'
-        '    <div class="top-meta">Gesti\u00f3n Presupuestal 2026</div>\n'
+        '    <div style="font-size:11px;color:#8A99AA">CI Fortia Minerals S.A.S.</div>\n'
         '  </div>\n'
         '  <div class="content">\n'
         '    <div id="wc-dash"></div>\n'
@@ -479,19 +783,22 @@ render();
         '        <div class="homo-header">\n'
         '          <div>\n'
         '            <p class="homo-title">Homologaciones IA</p>\n'
-        '            <p class="homo-sub">Comparaci\u00f3n contextual por \u00c1rea + Cuenta para m\u00e1xima precisi\u00f3n.</p>\n'
+        '            <p class="homo-sub">Comparaci\u00f3n contextual por \u00c1rea + Cuenta. Aprueba, rechaza o edita manualmente.</p>\n'
         '          </div>\n'
         '          <div id="homo-header-extra" style="display:flex;align-items:center;gap:6px"></div>\n'
         '        </div>\n'
+        '        <div id="homo-form-wrap"></div>\n'
         '        <div style="overflow-x:auto">\n'
         '          <table class="homo-table">\n'
-        '            <thead><tr><th>\u00c1rea / Cuenta</th><th>Ejecuci\u00f3n (Texto)</th>'
-        '<th>Sugerencia Presupuesto</th><th>Confianza</th><th>Acci\u00f3n</th></tr></thead>\n'
+        '            <thead><tr><th>\u00c1rea / Cuenta</th><th>Texto Ejecutado</th>'
+        '<th>Sugerencia IA</th><th>Editar</th><th>Confianza</th><th>Acci\u00f3n</th></tr></thead>\n'
         '            <tbody id="homo-body"></tbody>\n'
         '          </table>\n'
         '        </div>\n'
-        '        <div style="margin-top:16px;display:flex;gap:10px">\n'
-        '          <button class="btn-primary" onclick="saveHomo()">Sincronizar y Aplicar</button>\n'
+        '        <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">\n'
+        '          <button class="btn-primary" onclick="saveHomo()">&#8659; Exportar Homologaciones</button>\n'
+        '          <button class="btn-ghost" onclick="approveAllArea()">Aprobar todas visibles</button>\n'
+        '          <button class="btn-ghost" style="border-color:#BFDBFE;color:#185FA5" onclick="_homoFormOpen=true;renderHomo()">&#43; Agregar manual</button>\n'
         '        </div>\n'
         '      </div>\n'
         '    </div>\n'
@@ -502,7 +809,8 @@ render();
     )
 
     with open('presupuesto_ejecucion.html', 'w', encoding='utf-8') as f:
-        f.write(html)
+        f.write(HTML)
+    logging.info("HTML generado.")
 
 
 if __name__ == "__main__": main()
