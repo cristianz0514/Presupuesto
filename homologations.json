@@ -188,7 +188,7 @@
     "cuenta": "Consumo Inventario Almacen",
     "original": ";filtro de aire e cabina at191102",
     "suggested": "Filtro de aire e cabina at191102 / pa 5314",
-    "confidence": 85.0,
+    "confidence": 85,
     "status": "pending"
   },
   {
@@ -204,7 +204,7 @@
     "cuenta": "Consumo Inventario Almacen",
     "original": ";filtro separador agua-comb p551329",
     "suggested": "Filtro separador agua/combustible p551329 / bf1280",
-    "confidence": 80.0,
+    "confidence": 80,
     "status": "pending"
   },
   {
@@ -244,7 +244,7 @@
     "cuenta": "Consumo Inventario Almacen",
     "original": ";reflector led 200 w",
     "suggested": "Reflector led 200 w",
-    "confidence": 99.0,
+    "confidence": 99,
     "status": "pending"
   },
   {
@@ -276,7 +276,7 @@
     "cuenta": "Consumo Inventario Almacen",
     "original": ";soldadura durowell 650 x 5-32",
     "suggested": "Soldadura durowell 650 x 5/32",
-    "confidence": 98.0,
+    "confidence": 98,
     "status": "pending"
   },
   {
@@ -284,7 +284,7 @@
     "cuenta": "Consumo Inventario Almacen",
     "original": ";soldadura niquel 100",
     "suggested": "Soldadura niquel 100",
-    "confidence": 99.0,
+    "confidence": 99,
     "status": "pending"
   },
   {
@@ -332,7 +332,7 @@
     "cuenta": "Dotacion Y Suministro A Trabajadores",
     "original": ";pieza facial media cara 7501 talla l",
     "suggested": "Pieza facial media cara  3m 7501 ts",
-    "confidence": 85.0,
+    "confidence": 85,
     "status": "pending"
   },
   {
@@ -436,7 +436,7 @@
     "cuenta": "Consumo Inventario Almacen",
     "original": ";guasa  1-2 pulg",
     "suggested": "Guasa  1\"",
-    "confidence": 82.0,
+    "confidence": 82,
     "status": "pending"
   },
   {
@@ -484,7 +484,7 @@
     "cuenta": "Consumo Inventario Almacen",
     "original": ";retenedor 125-160-15",
     "suggested": "Retenedor 125-160-15",
-    "confidence": 99.0,
+    "confidence": 99,
     "status": "pending"
   }
 ]
